@@ -33,23 +33,23 @@ fn main() {
             print_color(0, 0, 0, "\t");
             for x in 0..5 {
 
-                if should_print_line(&mut notes, x, row) == false { 
+                if should_print_line(&notes, x, row) == false { 
                     print_color(0, 0, 0, "\t\t");
                     continue;
                 }
 
-                let mut charToPrint = "│";
+                let mut char_to_print = "│";
 
                 if row == rows - 1 {
-                    charToPrint = "◼"
+                    char_to_print = "◼"
                 }
 
                 match x {
-                    0 => { print_color(green_col[0], green_col[1], green_col[2], charToPrint);}
-                    1 => { print_color(red_col[0], red_col[1], red_col[2], charToPrint);}
-                    2 => { print_color(yellow_col[0], yellow_col[1], yellow_col[2], charToPrint);}
-                    3 => { print_color(blue_col[0], blue_col[1], blue_col[2], charToPrint);}
-                    4 => { print_color(orange_col[0], orange_col[1], orange_col[2], charToPrint)}
+                    0 => { print_color(green_col[0], green_col[1], green_col[2], char_to_print);}
+                    1 => { print_color(red_col[0], red_col[1], red_col[2], char_to_print);}
+                    2 => { print_color(yellow_col[0], yellow_col[1], yellow_col[2], char_to_print);}
+                    3 => { print_color(blue_col[0], blue_col[1], blue_col[2], char_to_print);}
+                    4 => { print_color(orange_col[0], orange_col[1], orange_col[2], char_to_print)}
                     _ => {}
 
                 }
@@ -82,7 +82,7 @@ fn print_notes(notes: &mut Vec<Note>, on_row: i32) {
     }
 }
 
-fn should_print_line(notes: &mut Vec<Note> ,col: i32, row: i32) -> bool {
+fn should_print_line(notes: &Vec<Note> ,col: i32, row: i32) -> bool {
     for note in notes {
         if note.line_index == col {
             if note.row_index == row {
