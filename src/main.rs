@@ -4,7 +4,7 @@ use std::thread::sleep_ms;
 struct Note {
     pub line_index: i32,
     pub row_index: i32,
-    pub row: i32
+    pub col: i32
 } 
 
 fn main() {
@@ -13,6 +13,7 @@ fn main() {
 
 
     let rows = 40;
+    let mut score: i32 = 0;
 
     let green_col: [i32; 3] = [0, 255, 0];
     let red_col: [i32; 3] = [255, 0, 0];
@@ -21,9 +22,9 @@ fn main() {
     let orange_col: [i32; 3] = [255, 165, 0];
 
     let mut notes: Vec<Note> = Vec::new();
-    notes.push(Note { line_index: 0, row_index: 1, row: 9 });
-    notes.push(Note { line_index: 0, row_index: 10, row: 9 });
-    notes.push(Note { line_index: 1, row_index: 1, row: 9*3 - 2 });
+    notes.push(Note { line_index: 0, row_index: 1, col: 9 });
+    notes.push(Note { line_index: 0, row_index: 10, col: 9 });
+    notes.push(Note { line_index: 1, row_index: 1, col: 9*3 - 2 });
 
     hide_cursor();
     while true {
@@ -57,8 +58,19 @@ fn main() {
             }
         }
 
+        set_cursor(80, rows);
+        print_color(255, 255, 255, format!("Score : {score}").as_str());
+
 
         print_notes(&mut notes, rows);
+
+
+       // TODO run this on key press callback 
+        for note in &mut *notes {
+            if note.row_index >= rows - 2 {
+                score += 1;
+            }
+        }
 
 
         sleep_ms(100);
@@ -69,8 +81,10 @@ fn main() {
 
 
 fn print_notes(notes: &mut Vec<Note>, on_row: i32) {
-    for note in notes {
-        set_cursor(note.row, note.row_index);
+    let mut to_remove: Vec<usize> = Vec::new();
+    let mut index: usize = 0;
+    for note in &mut *notes {
+        set_cursor(note.col, note.row_index);
         print_color(255, 255, 255, "◈");
 
         note.row_index += 1;
@@ -78,7 +92,16 @@ fn print_notes(notes: &mut Vec<Note>, on_row: i32) {
 
         if note.row_index == on_row - 1{
             note.row_index = 1;
+            to_remove.push(index);
         }
+        else{
+            index += 1;
+        }
+    }
+
+
+    for notes_to_rm in to_remove {
+        notes.remove(notes_to_rm);
     }
 }
 
