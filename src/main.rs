@@ -1,4 +1,9 @@
+use std::process::exit;
+use std::sync::{Arc, Mutex};
 use std::thread::sleep_ms;
+use std::thread;
+use std::io::{self, Read};
+use termios::{Termios, TCSAFLUSH, tcsetattr, ECHO, ICANON};
 
 #[derive(Clone, Copy)]
 struct Note {
@@ -7,13 +12,16 @@ struct Note {
     pub col: i32
 } 
 
+const rows: i32 = 40;
+type Score = Arc<Mutex<i32>>;
+type Notes = Arc<Mutex<Vec<Note>>>;
+
+
 fn main() {
     clear_console();
     set_cursor(1, 1);
 
-
-    let rows = 40;
-    let mut score: i32 = 0;
+    let score: Score = Arc::new(Mutex::new(0));
 
     let green_col: [i32; 3] = [0, 255, 0];
     let red_col: [i32; 3] = [255, 0, 0];
@@ -21,20 +29,26 @@ fn main() {
     let blue_col: [i32; 3] = [0, 0, 255];
     let orange_col: [i32; 3] = [255, 165, 0];
 
-    let mut notes: Vec<Note> = Vec::new();
-    notes.push(Note { line_index: 0, row_index: 1, col: 9 });
-    notes.push(Note { line_index: 0, row_index: 10, col: 9 });
-    notes.push(Note { line_index: 1, row_index: 1, col: 9*3 - 2 });
+    let notes: Notes = Arc::new(Mutex::new(Vec::new()));
+    {
+        let mut note = notes.lock().unwrap();
+        note.push(Note { line_index: 0, row_index: 1, col: 9 });
+        note.push(Note { line_index: 0, row_index: 10, col: 9 });
+        note.push(Note { line_index: 1, row_index: 1, col: 9*3 - 2 });
+    }
+
 
     hide_cursor();
-    while true {
+    handle_input(Arc::clone(&notes), Arc::clone(&score));
+    loop {
         set_cursor(1, 1);
         for row in 1..rows {
             set_cursor(1, row);
             print_color(0, 0, 0, "\t");
+            let note_gard = notes.lock().unwrap();
             for x in 0..5 {
 
-                if should_print_line(&notes, x, row) == false { 
+                if should_print_line(&note_gard, x, row) == false { 
                     print_color(0, 0, 0, "\t\t");
                     continue;
                 }
@@ -44,6 +58,7 @@ fn main() {
                 if row == rows - 1 {
                     char_to_print = "◼"
                 }
+                
 
                 match x {
                     0 => { print_color(green_col[0], green_col[1], green_col[2], char_to_print);}
@@ -59,38 +74,46 @@ fn main() {
         }
 
         set_cursor(80, rows);
-        print_color(255, 255, 255, format!("Score : {score}").as_str());
-
-
-        print_notes(&mut notes, rows);
-
-
-       // TODO run this on key press callback 
-        for note in &mut *notes {
-            if note.row_index >= rows - 2 {
-                score += 1;
-            }
+        {
+            let arc_score = *score.lock().unwrap();
+            print_color(255, 255, 255, format!("Score : {arc_score}").as_str());
         }
 
 
-        sleep_ms(100);
-
+        print_notes(&notes, rows);
+        sleep_ms(50);
     }
 }
 
 
+fn inbounds(line_index: i32, notes: &Notes, score: &Score) {
 
-fn print_notes(notes: &mut Vec<Note>, on_row: i32) {
+    let arc_notes = notes.lock().unwrap();
+
+    for note in arc_notes.iter() {
+        if note.line_index != line_index { continue; } 
+        if note.row_index + 2 >= rows - 2 {
+            let mut arc_score = score.lock().unwrap();
+            *arc_score += 1;
+            break;
+       }
+    }
+
+}
+
+
+fn print_notes(notes: &Notes, on_row: i32) {
     let mut to_remove: Vec<usize> = Vec::new();
     let mut index: usize = 0;
-    for note in &mut *notes {
+    let mut arc_note = notes.lock().unwrap();
+    for note in arc_note.iter_mut() {
         set_cursor(note.col, note.row_index);
         print_color(255, 255, 255, "◈");
 
         note.row_index += 1;
 
 
-        if note.row_index == on_row - 1{
+        if note.row_index == on_row {
             note.row_index = 1;
             to_remove.push(index);
         }
@@ -101,12 +124,83 @@ fn print_notes(notes: &mut Vec<Note>, on_row: i32) {
 
 
     for notes_to_rm in to_remove {
-        notes.remove(notes_to_rm);
+        arc_note.remove(notes_to_rm);
     }
 }
 
-fn should_print_line(notes: &Vec<Note> ,col: i32, row: i32) -> bool {
-    for note in notes {
+fn handle_input(notes: Notes, score: Score) {
+    thread::spawn(move || {
+        let stdin = 0; 
+        let termios = Termios::from_fd(stdin).unwrap();
+        let mut new_termios = termios.clone();  
+        new_termios.c_lflag &= !(ICANON | ECHO); 
+        tcsetattr(stdin, TCSAFLUSH, &new_termios).unwrap();
+        let mut buffer = [0; 1]; 
+
+        loop {
+            io::stdin().read_exact(&mut buffer).unwrap();
+            let key = buffer[0];
+
+            match key {
+                b'q' => {
+                    tcsetattr(stdin, TCSAFLUSH, &termios).unwrap();
+                    //clear_console();
+                    show_cursor();
+                    exit(1);
+                }
+                b'1' => {
+                    let mut note = notes.lock().unwrap();
+                    note.push(Note { line_index: 0, row_index: 1, col: 9 });
+                }
+                b'2' => {
+                    let mut note = notes.lock().unwrap();
+                    note.push(Note { line_index: 1, row_index: 1, col: 9*3 - 2 });
+                }
+                b'3' => {
+                    let mut note = notes.lock().unwrap();
+                    note.push(Note { line_index: 2, row_index: 1, col: 9*4 + 5 });
+                }
+                b'4' => {
+                    let mut note = notes.lock().unwrap();
+                    note.push(Note { line_index: 3, row_index: 1, col: 9*6 + 3 });
+                }
+                b'5' => {
+                    let mut note = notes.lock().unwrap();
+                    note.push(Note { line_index: 4, row_index: 1, col: 9*8 + 1 });
+                }
+                b'a' => {
+                    let line_index = 0;
+                    inbounds(line_index, &notes, &score);
+                }
+
+                b's' => {
+                    let line_index = 1;
+                    inbounds(line_index, &notes, &score);
+                }
+
+                b'f' => {
+                    let line_index = 2;
+                    inbounds(line_index, &notes, &score);
+                }
+
+                b'g' => {
+                    let line_index = 3;
+                    inbounds(line_index, &notes, &score);
+                }
+
+                b'h' => {
+                    let line_index = 4;
+                    inbounds(line_index, &notes, &score);
+                }
+                _ => { continue; }
+            }
+        }
+
+    });
+}
+
+fn should_print_line(notes: &[Note] ,col: i32, row: i32) -> bool {
+    for note in notes.iter() {
         if note.line_index == col {
             if note.row_index == row {
                 return  false;
