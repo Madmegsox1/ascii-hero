@@ -2,8 +2,7 @@ use std::process::exit;
 use std::sync::{Arc, Mutex};
 use std::thread::sleep_ms;
 use std::thread;
-use std::io::{self, Read};
-use termios::{Termios, TCSAFLUSH, tcsetattr, ECHO, ICANON};
+use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
 
 #[derive(Clone, Copy)]
 struct Note {
@@ -130,69 +129,70 @@ fn print_notes(notes: &Notes, on_row: i32) {
 
 fn handle_input(notes: Notes, score: Score) {
     thread::spawn(move || {
-        let stdin = 0; 
-        let termios = Termios::from_fd(stdin).unwrap();
-        let mut new_termios = termios.clone();  
-        new_termios.c_lflag &= !(ICANON | ECHO); 
-        tcsetattr(stdin, TCSAFLUSH, &new_termios).unwrap();
-        let mut buffer = [0; 1]; 
-
         loop {
-            io::stdin().read_exact(&mut buffer).unwrap();
-            let key = buffer[0];
+            let event = event::read();
 
-            match key {
-                b'q' => {
-                    tcsetattr(stdin, TCSAFLUSH, &termios).unwrap();
-                    //clear_console();
-                    show_cursor();
-                    exit(1);
-                }
-                b'1' => {
-                    let mut note = notes.lock().unwrap();
-                    note.push(Note { line_index: 0, row_index: 1, col: 9 });
-                }
-                b'2' => {
-                    let mut note = notes.lock().unwrap();
-                    note.push(Note { line_index: 1, row_index: 1, col: 9*3 - 2 });
-                }
-                b'3' => {
-                    let mut note = notes.lock().unwrap();
-                    note.push(Note { line_index: 2, row_index: 1, col: 9*4 + 5 });
-                }
-                b'4' => {
-                    let mut note = notes.lock().unwrap();
-                    note.push(Note { line_index: 3, row_index: 1, col: 9*6 + 3 });
-                }
-                b'5' => {
-                    let mut note = notes.lock().unwrap();
-                    note.push(Note { line_index: 4, row_index: 1, col: 9*8 + 1 });
-                }
-                b'a' => {
-                    let line_index = 0;
-                    inbounds(line_index, &notes, &score);
-                }
+            match &event {
+                Err(e) => { continue; }
+                Ok(a) => { }
+                _ => {}
+            }
 
-                b's' => {
-                    let line_index = 1;
-                    inbounds(line_index, &notes, &score);
-                }
 
-                b'f' => {
-                    let line_index = 2;
-                    inbounds(line_index, &notes, &score);
-                }
+            if let Event::Key(KeyEvent {
+                code: KeyCode::Char(c),
+                kind: KeyEventKind::Release,
+                ..
 
-                b'g' => {
-                    let line_index = 3;
-                    inbounds(line_index, &notes, &score);
+            }) = event.unwrap()
+            {
+                match c {
+                    'q' => {
+                        show_cursor();
+                        exit(1);
+                    }
+                    '1' => {
+                        let mut note = notes.lock().unwrap();
+                        note.push(Note { line_index: 0, row_index: 1, col: 9 });
+                    }
+                    '2' => {
+                        let mut note = notes.lock().unwrap();
+                        note.push(Note { line_index: 1, row_index: 1, col: 9*3 - 2 });
+                    }
+                    '3' => {
+                        let mut note = notes.lock().unwrap();
+                        note.push(Note { line_index: 2, row_index: 1, col: 9*4 + 5 });
+                    }
+                    '4' => {
+                        let mut note = notes.lock().unwrap();
+                        note.push(Note { line_index: 3, row_index: 1, col: 9*6 + 3 });
+                    }
+                    '5' => {
+                        let mut note = notes.lock().unwrap();
+                        note.push(Note { line_index: 4, row_index: 1, col: 9*8 + 1 });
+                    }
+                    'a' => {
+                        let line_index = 0;
+                        inbounds(line_index, &notes, &score);
+                    }
+                    's' => {
+                        let line_index = 1;
+                        inbounds(line_index, &notes, &score);
+                    }
+                    'f' => {
+                        let line_index = 2;
+                        inbounds(line_index, &notes, &score);
+                    }
+                    'g' => {
+                        let line_index = 3;
+                        inbounds(line_index, &notes, &score);
+                    }
+                    'h' => {
+                        let line_index = 4;
+                        inbounds(line_index, &notes, &score);
+                    }
+                    _ => { continue; }
                 }
-
-                b'h' => {
-                    let line_index = 4;
-                    inbounds(line_index, &notes, &score);
-                }
-                _ => { continue; }
             }
         }
 
