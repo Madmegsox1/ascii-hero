@@ -4,6 +4,8 @@ use std::thread::sleep_ms;
 use std::thread;
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
 
+mod song_loader; 
+
 #[derive(Clone, Copy)]
 struct Note {
     pub line_index: i32,
@@ -198,6 +200,7 @@ fn handle_input(notes: Notes, score: Score) {
 
     });
 }
+
 
 fn should_print_line(notes: &[Note] ,col: i32, row: i32) -> bool {
     for note in notes.iter() {
